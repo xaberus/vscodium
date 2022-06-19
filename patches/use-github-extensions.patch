@@ -1,7 +1,7 @@
 diff --git a/build/gulpfile.extensions.js b/build/gulpfile.extensions.js
 --- a/build/gulpfile.extensions.js
 +++ b/build/gulpfile.extensions.js
-@@ -223,7 +223,7 @@ const cleanExtensionsBuildTask = task.define('clean-extensions-build', util.rimr
+@@ -236,7 +236,7 @@ const cleanExtensionsBuildTask = task.define('clean-extensions-build', util.rimr
  const compileExtensionsBuildTask = task.define('compile-extensions-build', task.series(
  	cleanExtensionsBuildTask,
  	task.define('bundle-extensions-build', () => ext.packageLocalExtensionsStream(false).pipe(gulp.dest('.build'))),

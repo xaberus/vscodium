@@ -1,5 +1,4 @@
 diff --git a/extensions/github-authentication/src/githubServer.ts b/extensions/github-authentication/src/githubServer.ts
-index c366ff3..75f32da 100644
 --- a/extensions/github-authentication/src/githubServer.ts
 +++ b/extensions/github-authentication/src/githubServer.ts
 @@ -3,27 +3,13 @@
@@ -378,10 +377,9 @@ index c366ff3..75f32da 100644
  		const apiUri = vscode.Uri.parse('https://api.github.com');
  		return vscode.Uri.parse(`${apiUri.scheme}://${apiUri.authority}${path}`);
 diff --git a/src/vs/workbench/browser/parts/activitybar/activitybarActions.ts b/src/vs/workbench/browser/parts/activitybar/activitybarActions.ts
-index 36647e6..55e722b 100644
 --- a/src/vs/workbench/browser/parts/activitybar/activitybarActions.ts
 +++ b/src/vs/workbench/browser/parts/activitybar/activitybarActions.ts
-@@ -271,7 +271,7 @@ export class AccountsActivityActionViewItem extends MenuActivityActionViewItem {
+@@ -272,7 +272,7 @@ export class AccountsActivityActionViewItem extends MenuActivityActionViewItem {
  			}
  		});
  
@@ -391,7 +389,6 @@ index 36647e6..55e722b 100644
  			menus.push(noAccountsAvailableAction);
  		}
 diff --git a/src/vs/workbench/services/authentication/browser/authenticationService.ts b/src/vs/workbench/services/authentication/browser/authenticationService.ts
-index f543021..ad40bc3 100644
 --- a/src/vs/workbench/services/authentication/browser/authenticationService.ts
 +++ b/src/vs/workbench/services/authentication/browser/authenticationService.ts
 @@ -272,16 +272,6 @@ export class AuthenticationService extends Disposable implements IAuthentication

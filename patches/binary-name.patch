@@ -1,5 +1,4 @@
 diff --git a/build/gulpfile.vscode.js b/build/gulpfile.vscode.js
-index 2686509..4fedec2 100644
 --- a/build/gulpfile.vscode.js
 +++ b/build/gulpfile.vscode.js
 @@ -289,7 +289,7 @@ function packageTask(platform, arch, sourceFolderName, destinationFolderName, op
@@ -12,10 +11,9 @@ index 2686509..4fedec2 100644
  			all = es.merge(all, shortcut);
  		}
 diff --git a/src/vs/platform/native/electron-main/nativeHostMainService.ts b/src/vs/platform/native/electron-main/nativeHostMainService.ts
-index f7bd477..a489ae4 100644
 --- a/src/vs/platform/native/electron-main/nativeHostMainService.ts
 +++ b/src/vs/platform/native/electron-main/nativeHostMainService.ts
-@@ -351,7 +351,7 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
+@@ -350,7 +350,7 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
  	}
  
  	private async getShellCommandLink(): Promise<{ readonly source: string; readonly target: string }> {
@@ -24,7 +22,7 @@ index f7bd477..a489ae4 100644
  		const source = `/usr/local/bin/${this.productService.applicationName}`;
  
  		// Ensure source exists
-@@ -545,7 +545,7 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
+@@ -540,7 +540,7 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
  
  		// macOS
  		if (this.environmentMainService.isBuilt) {

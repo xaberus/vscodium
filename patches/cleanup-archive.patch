@@ -1,5 +1,4 @@
 diff --git a/build/gulpfile.vscode.win32.js b/build/gulpfile.vscode.win32.js
-index 81ba509..59041e2 100644
 --- a/build/gulpfile.vscode.win32.js
 +++ b/build/gulpfile.vscode.win32.js
 @@ -137,7 +137,7 @@ defineWin32SetupTasks('arm64', 'user');

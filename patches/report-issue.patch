@@ -1,8 +1,7 @@
 diff --git a/src/vs/code/electron-sandbox/issue/issueReporterMain.ts b/src/vs/code/electron-sandbox/issue/issueReporterMain.ts
-index fcd4485..8d97e5a 100644
 --- a/src/vs/code/electron-sandbox/issue/issueReporterMain.ts
 +++ b/src/vs/code/electron-sandbox/issue/issueReporterMain.ts
-@@ -682,7 +682,7 @@ export class IssueReporter extends Disposable {
+@@ -672,7 +672,7 @@ export class IssueReporter extends Disposable {
  
  		sourceSelect.innerText = '';
  		sourceSelect.append(this.makeOption('', localize('selectSource', "Select source"), true));
@@ -12,10 +11,9 @@ index fcd4485..8d97e5a 100644
  		if (this.configuration.product.reportMarketplaceIssueUrl) {
  			sourceSelect.append(this.makeOption('marketplace', localize('marketplace', "Extensions marketplace"), false));
 diff --git a/src/vs/workbench/contrib/extensions/electron-sandbox/extensionsSlowActions.ts b/src/vs/workbench/contrib/extensions/electron-sandbox/extensionsSlowActions.ts
-index 0c5855b..654f9a4 100644
 --- a/src/vs/workbench/contrib/extensions/electron-sandbox/extensionsSlowActions.ts
 +++ b/src/vs/workbench/contrib/extensions/electron-sandbox/extensionsSlowActions.ts
-@@ -144,7 +144,7 @@ class ReportExtensionSlowAction extends Action {
+@@ -146,7 +146,7 @@ class ReportExtensionSlowAction extends Action {
  - Extension Name: \`${this.extension.name}\`
  - Extension Version: \`${this.extension.version}\`
  - OS Version: \`${osVersion}\`
@@ -25,7 +23,6 @@ index 0c5855b..654f9a4 100644
  		const url = `${this.repoInfo.base}/${this.repoInfo.owner}/${this.repoInfo.repo}/issues/new/?body=${body}&title=${title}`;
  		this._openerService.open(URI.parse(url));
 diff --git a/src/vs/workbench/contrib/extensions/electron-sandbox/reportExtensionIssueAction.ts b/src/vs/workbench/contrib/extensions/electron-sandbox/reportExtensionIssueAction.ts
-index f1755db..e77be21 100644
 --- a/src/vs/workbench/contrib/extensions/electron-sandbox/reportExtensionIssueAction.ts
 +++ b/src/vs/workbench/contrib/extensions/electron-sandbox/reportExtensionIssueAction.ts
 @@ -14,7 +14,7 @@ import { ExtensionType, IExtensionDescription } from 'vs/platform/extensions/com

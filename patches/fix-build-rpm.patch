@@ -1,5 +1,4 @@
 diff --git a/build/linux/rpm/dependencies-generator.js b/build/linux/rpm/dependencies-generator.js
-index 1d91eb8..ed6b775 100644
 --- a/build/linux/rpm/dependencies-generator.js
 +++ b/build/linux/rpm/dependencies-generator.js
 @@ -16,7 +16,7 @@ const dep_lists_1 = require("./dep-lists");
@@ -12,10 +11,9 @@ index 1d91eb8..ed6b775 100644
      // Get the files for which we want to find dependencies.
      const nativeModulesPath = path.join(buildDir, 'resources', 'app', 'node_modules.asar.unpacked');
 diff --git a/build/linux/rpm/dependencies-generator.ts b/build/linux/rpm/dependencies-generator.ts
-index 95953ec..f5ffc2e 100644
 --- a/build/linux/rpm/dependencies-generator.ts
 +++ b/build/linux/rpm/dependencies-generator.ts
-@@ -18,7 +18,7 @@ import { ArchString } from './types';
+@@ -16,7 +16,7 @@ import { ArchString } from './types';
  // If true, we fail the build if there are new dependencies found during that task.
  // The reference dependencies, which one has to update when the new dependencies
  // are valid, are in dep-lists.ts
@@ -25,10 +23,9 @@ index 95953ec..f5ffc2e 100644
  export function getDependencies(buildDir: string, applicationName: string, arch: ArchString): string[] {
  	// Get the files for which we want to find dependencies.
 diff --git a/resources/linux/rpm/code.spec.template b/resources/linux/rpm/code.spec.template
-index 5b7eadb..87c914d 100644
 --- a/resources/linux/rpm/code.spec.template
 +++ b/resources/linux/rpm/code.spec.template
-@@ -74,3 +74,5 @@ update-mime-database /usr/share/mime &> /dev/null || :
+@@ -76,3 +76,5 @@ update-mime-database /usr/share/mime &> /dev/null || :
  /usr/share/pixmaps/@@ICON@@.png
  /usr/share/bash-completion/completions/@@NAME@@
  /usr/share/zsh/site-functions/_@@NAME@@

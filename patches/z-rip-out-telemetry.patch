@@ -1,0 +1,753 @@
+diff --git a/src/vs/code/electron-browser/sharedProcess/sharedProcessMain.ts b/src/vs/code/electron-browser/sharedProcess/sharedProcessMain.ts
+--- a/src/vs/code/electron-browser/sharedProcess/sharedProcessMain.ts
++++ b/src/vs/code/electron-browser/sharedProcess/sharedProcessMain.ts
+@@ -4,7 +4,6 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { ipcRenderer } from 'electron';
+-import { hostname, release } from 'os';
+ import { toErrorMessage } from 'vs/base/common/errorMessage';
+ import { onUnexpectedError, setUnexpectedErrorHandler } from 'vs/base/common/errors';
+ import { combinedDisposable, Disposable, toDisposable } from 'vs/base/common/lifecycle';
+@@ -58,13 +57,9 @@ import { IRequestService } from 'vs/platform/request/common/request';
+ import { ISharedProcessConfiguration } from 'vs/platform/sharedProcess/node/sharedProcess';
+ import { IStorageService } from 'vs/platform/storage/common/storage';
+ import { NativeStorageService } from 'vs/platform/storage/electron-sandbox/storageService';
+-import { resolveCommonProperties } from 'vs/platform/telemetry/common/commonProperties';
+ import { ICustomEndpointTelemetryService, ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
+ import { TelemetryAppenderChannel } from 'vs/platform/telemetry/common/telemetryIpc';
+-import { TelemetryLogAppender } from 'vs/platform/telemetry/common/telemetryLogAppender';
+-import { TelemetryService } from 'vs/platform/telemetry/common/telemetryService';
+-import { supportsTelemetry, ITelemetryAppender, NullAppender, NullTelemetryService, getPiiPathsFromEnvironment } from 'vs/platform/telemetry/common/telemetryUtils';
+-import { AppInsightsAppender } from 'vs/platform/telemetry/node/appInsightsAppender';
++import { ITelemetryAppender, NullAppender, NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
+ import { CustomEndpointTelemetryService } from 'vs/platform/telemetry/node/customEndpointTelemetryService';
+ import { LocalReconnectConstants, TerminalIpcChannels, TerminalSettingId } from 'vs/platform/terminal/common/terminal';
+ import { ILocalPtyService } from 'vs/platform/terminal/electron-sandbox/terminal';
+@@ -105,7 +100,6 @@ import { ExtensionsProfileScannerService, IExtensionsProfileScannerService } fro
+ import { PolicyChannelClient } from 'vs/platform/policy/common/policyIpc';
+ import { IPolicyService, NullPolicyService } from 'vs/platform/policy/common/policy';
+ import { UserDataProfilesNativeService } from 'vs/platform/userDataProfile/electron-sandbox/userDataProfile';
+-import { OneDataSystemWebAppender } from 'vs/platform/telemetry/browser/1dsAppender';
+ 
+ class SharedProcessMain extends Disposable {
+ 
+@@ -277,33 +271,10 @@ class SharedProcessMain extends Disposable {
+ 		// Telemetry
+ 		let telemetryService: ITelemetryService;
+ 		const appenders: ITelemetryAppender[] = [];
+-		if (supportsTelemetry(productService, environmentService)) {
+-			const logAppender = new TelemetryLogAppender(loggerService, environmentService);
+-			appenders.push(logAppender);
+-			const { installSourcePath } = environmentService;
+-			const internalTesting = configurationService.getValue<boolean>('telemetry.internalTesting');
+-			if (internalTesting && productService.aiConfig?.ariaKey) {
+-				const collectorAppender = new OneDataSystemWebAppender(configurationService, 'monacoworkbench', null, productService.aiConfig.ariaKey);
+-				this._register(toDisposable(() => collectorAppender.flush())); // Ensure the 1DS appender is disposed so that it flushes remaining data
+-				appenders.push(collectorAppender);
+-			} else if (productService.aiConfig && productService.aiConfig.asimovKey) {
+-				// Application Insights
+-				const appInsightsAppender = new AppInsightsAppender('monacoworkbench', null, productService.aiConfig.asimovKey);
+-				this._register(toDisposable(() => appInsightsAppender.flush())); // Ensure the AI appender is disposed so that it flushes remaining data
+-				appenders.push(appInsightsAppender);
+-			}
+ 
+-			telemetryService = new TelemetryService({
+-				appenders,
+-				commonProperties: resolveCommonProperties(fileService, release(), hostname(), process.arch, productService.commit, productService.version, this.configuration.machineId, productService.msftInternalDomains, installSourcePath),
+-				sendErrorTelemetry: true,
+-				piiPaths: getPiiPathsFromEnvironment(environmentService),
+-			}, configurationService, productService);
+-		} else {
+-			telemetryService = NullTelemetryService;
+-			const nullAppender = NullAppender;
+-			appenders.push(nullAppender);
+-		}
++		telemetryService = NullTelemetryService;
++		const nullAppender = NullAppender;
++		appenders.push(nullAppender);
+ 
+ 		this.server.registerChannel('telemetryAppender', new TelemetryAppenderChannel(appenders));
+ 		services.set(ITelemetryService, telemetryService);
+diff --git a/src/vs/code/electron-main/app.ts b/src/vs/code/electron-main/app.ts
+--- a/src/vs/code/electron-main/app.ts
++++ b/src/vs/code/electron-main/app.ts
+@@ -6,7 +6,6 @@
+ import { app, BrowserWindow, contentTracing, dialog, protocol, session, Session, systemPreferences, WebFrameMain } from 'electron';
+ import { validatedIpcMain } from 'vs/base/parts/ipc/electron-main/ipcMain';
+ import { statSync } from 'fs';
+-import { hostname, release } from 'os';
+ import { VSBuffer } from 'vs/base/common/buffer';
+ import { toErrorMessage } from 'vs/base/common/errorMessage';
+ import { onUnexpectedError, setUnexpectedErrorHandler } from 'vs/base/common/errors';
+@@ -71,11 +70,8 @@ import { ISignService } from 'vs/platform/sign/common/sign';
+ import { IStateMainService } from 'vs/platform/state/electron-main/state';
+ import { StorageDatabaseChannel } from 'vs/platform/storage/electron-main/storageIpc';
+ import { ApplicationStorageMainService, IApplicationStorageMainService, IStorageMainService, StorageMainService } from 'vs/platform/storage/electron-main/storageMainService';
+-import { resolveCommonProperties } from 'vs/platform/telemetry/common/commonProperties';
+ import { ITelemetryService, machineIdKey, TelemetryLevel } from 'vs/platform/telemetry/common/telemetry';
+-import { TelemetryAppenderClient } from 'vs/platform/telemetry/common/telemetryIpc';
+-import { ITelemetryServiceConfig, TelemetryService } from 'vs/platform/telemetry/common/telemetryService';
+-import { getPiiPathsFromEnvironment, getTelemetryLevel, NullTelemetryService, supportsTelemetry } from 'vs/platform/telemetry/common/telemetryUtils';
++import { getTelemetryLevel, NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
+ import { IUpdateService } from 'vs/platform/update/common/update';
+ import { UpdateChannel } from 'vs/platform/update/common/updateIpc';
+ import { DarwinUpdateService } from 'vs/platform/update/electron-main/updateService.darwin';
+@@ -667,17 +663,7 @@ export class CodeApplication extends Disposable {
+ 		services.set(IURLService, new SyncDescriptor(NativeURLService));
+ 
+ 		// Telemetry
+-		if (supportsTelemetry(this.productService, this.environmentMainService)) {
+-			const channel = getDelayedChannel(sharedProcessReady.then(client => client.getChannel('telemetryAppender')));
+-			const appender = new TelemetryAppenderClient(channel);
+-			const commonProperties = resolveCommonProperties(this.fileService, release(), hostname(), process.arch, this.productService.commit, this.productService.version, machineId, this.productService.msftInternalDomains, this.environmentMainService.installSourcePath);
+-			const piiPaths = getPiiPathsFromEnvironment(this.environmentMainService);
+-			const config: ITelemetryServiceConfig = { appenders: [appender], commonProperties, piiPaths, sendErrorTelemetry: true };
+-
+-			services.set(ITelemetryService, new SyncDescriptor(TelemetryService, [config]));
+-		} else {
+-			services.set(ITelemetryService, NullTelemetryService);
+-		}
++		services.set(ITelemetryService, NullTelemetryService);
+ 
+ 		// Init services that require it
+ 		await backupMainService.initialize();
+@@ -1255,4 +1241,3 @@ export class CodeApplication extends Disposable {
+ 		});
+ 	}
+ }
+-
+diff --git a/src/vs/code/node/cliProcessMain.ts b/src/vs/code/node/cliProcessMain.ts
+--- a/src/vs/code/node/cliProcessMain.ts
++++ b/src/vs/code/node/cliProcessMain.ts
+@@ -3,7 +3,6 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
+-import { hostname, release } from 'os';
+ import { raceTimeout } from 'vs/base/common/async';
+ import { VSBuffer } from 'vs/base/common/buffer';
+ import { toErrorMessage } from 'vs/base/common/errorMessage';
+@@ -49,10 +48,8 @@ import { IRequestService } from 'vs/platform/request/common/request';
+ import { RequestService } from 'vs/platform/request/node/requestService';
+ import { IStateService } from 'vs/platform/state/node/state';
+ import { StateService } from 'vs/platform/state/node/stateService';
+-import { resolveCommonProperties } from 'vs/platform/telemetry/common/commonProperties';
+-import { ITelemetryService, machineIdKey } from 'vs/platform/telemetry/common/telemetry';
+-import { ITelemetryServiceConfig, TelemetryService } from 'vs/platform/telemetry/common/telemetryService';
+-import { supportsTelemetry, NullTelemetryService, getPiiPathsFromEnvironment } from 'vs/platform/telemetry/common/telemetryUtils';
++import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
++import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
+ import { AppInsightsAppender } from 'vs/platform/telemetry/node/appInsightsAppender';
+ import { buildTelemetryMessage } from 'vs/platform/telemetry/node/telemetry';
+ import { IUriIdentityService } from 'vs/platform/uriIdentity/common/uriIdentity';
+@@ -187,37 +184,7 @@ class CliMain extends Disposable {
+ 
+ 		// Telemetry
+ 		const appenders: AppInsightsAppender[] = [];
+-		if (supportsTelemetry(productService, environmentService)) {
+-			if (productService.aiConfig && productService.aiConfig.asimovKey) {
+-				appenders.push(new AppInsightsAppender('monacoworkbench', null, productService.aiConfig.asimovKey));
+-			}
+-
+-			const { installSourcePath } = environmentService;
+-
+-			const config: ITelemetryServiceConfig = {
+-				appenders,
+-				sendErrorTelemetry: false,
+-				commonProperties: (async () => {
+-					let machineId: string | undefined = undefined;
+-					try {
+-						const storageContents = await Promises.readFile(environmentService.stateResource.fsPath);
+-						machineId = JSON.parse(storageContents.toString())[machineIdKey];
+-					} catch (error) {
+-						if (error.code !== 'ENOENT') {
+-							logService.error(error);
+-						}
+-					}
+-
+-					return resolveCommonProperties(fileService, release(), hostname(), process.arch, productService.commit, productService.version, machineId, productService.msftInternalDomains, installSourcePath);
+-				})(),
+-				piiPaths: getPiiPathsFromEnvironment(environmentService)
+-			};
+-
+-			services.set(ITelemetryService, new SyncDescriptor(TelemetryService, [config]));
+-
+-		} else {
+-			services.set(ITelemetryService, NullTelemetryService);
+-		}
++		services.set(ITelemetryService, NullTelemetryService);
+ 
+ 		return [new InstantiationService(services), appenders];
+ 	}
+diff --git a/src/vs/platform/externalServices/common/marketplace.ts b/src/vs/platform/externalServices/common/marketplace.ts
+--- a/src/vs/platform/externalServices/common/marketplace.ts
++++ b/src/vs/platform/externalServices/common/marketplace.ts
+@@ -6,12 +6,10 @@
+ import { IHeaders } from 'vs/base/parts/request/common/request';
+ import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
+ import { IEnvironmentService } from 'vs/platform/environment/common/environment';
+-import { getServiceMachineId } from 'vs/platform/externalServices/common/serviceMachineId';
+ import { IFileService } from 'vs/platform/files/common/files';
+ import { IProductService } from 'vs/platform/product/common/productService';
+ import { IStorageService } from 'vs/platform/storage/common/storage';
+-import { ITelemetryService, TelemetryLevel } from 'vs/platform/telemetry/common/telemetry';
+-import { getTelemetryLevel, supportsTelemetry } from 'vs/platform/telemetry/common/telemetryUtils';
++import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
+ 
+ export async function resolveMarketplaceHeaders(version: string,
+ 	productService: IProductService,
+@@ -24,12 +22,5 @@ export async function resolveMarketplaceHeaders(version: string,
+ 		'X-Market-Client-Id': `VSCode ${version}`,
+ 		'User-Agent': `VSCode ${version} (${productService.nameShort})`
+ 	};
+-	const uuid = await getServiceMachineId(environmentService, fileService, storageService);
+-	const { sessionId } = await telemetryService.getTelemetryInfo();
+-
+-	if (supportsTelemetry(productService, environmentService) && getTelemetryLevel(configurationService) === TelemetryLevel.USAGE) {
+-		headers['X-Market-User-Id'] = uuid;
+-		headers['VSCode-SessionId'] = sessionId;
+-	}
+ 	return headers;
+ }
+diff --git a/src/vs/platform/telemetry/common/telemetryUtils.ts b/src/vs/platform/telemetry/common/telemetryUtils.ts
+--- a/src/vs/platform/telemetry/common/telemetryUtils.ts
++++ b/src/vs/platform/telemetry/common/telemetryUtils.ts
+@@ -12,7 +12,7 @@ import { ConfigurationTarget, ConfigurationTargetToString, IConfigurationService
+ import { IEnvironmentService } from 'vs/platform/environment/common/environment';
+ import { IProductService } from 'vs/platform/product/common/productService';
+ import { ClassifiedEvent, GDPRClassification, StrictPropertyCheck } from 'vs/platform/telemetry/common/gdprTypings';
+-import { ICustomEndpointTelemetryService, ITelemetryData, ITelemetryEndpoint, ITelemetryInfo, ITelemetryService, TelemetryConfiguration, TelemetryLevel, TELEMETRY_OLD_SETTING_ID, TELEMETRY_SETTING_ID } from 'vs/platform/telemetry/common/telemetry';
++import { ICustomEndpointTelemetryService, ITelemetryData, ITelemetryEndpoint, ITelemetryInfo, ITelemetryService, TelemetryLevel } from 'vs/platform/telemetry/common/telemetry';
+ 
+ export class NullTelemetryServiceShape implements ITelemetryService {
+ 	declare readonly _serviceBrand: undefined;
+@@ -112,7 +112,7 @@ export function configurationTelemetry(telemetryService: ITelemetryService, conf
+  * @returns false - telemetry is completely disabled, true - telemetry is logged locally, but may not be sent
+  */
+ export function supportsTelemetry(productService: IProductService, environmentService: IEnvironmentService): boolean {
+-	return !(environmentService.disableTelemetry || !productService.enableTelemetry || environmentService.extensionTestsLocationURI);
++	return false;
+ }
+ 
+ /**
+@@ -122,26 +122,7 @@ export function supportsTelemetry(productService: IProductService, environmentSe
+  * @returns OFF, ERROR, ON
+  */
+ export function getTelemetryLevel(configurationService: IConfigurationService): TelemetryLevel {
+-	const newConfig = configurationService.getValue<TelemetryConfiguration>(TELEMETRY_SETTING_ID);
+-	const crashReporterConfig = configurationService.getValue<boolean | undefined>('telemetry.enableCrashReporter');
+-	const oldConfig = configurationService.getValue<boolean | undefined>(TELEMETRY_OLD_SETTING_ID);
+-
+-	// If `telemetry.enableCrashReporter` is false or `telemetry.enableTelemetry' is false, disable telemetry
+-	if (oldConfig === false || crashReporterConfig === false) {
+-		return TelemetryLevel.NONE;
+-	}
+-
+-	// Maps new telemetry setting to a telemetry level
+-	switch (newConfig ?? TelemetryConfiguration.ON) {
+-		case TelemetryConfiguration.ON:
+-			return TelemetryLevel.USAGE;
+-		case TelemetryConfiguration.ERROR:
+-			return TelemetryLevel.ERROR;
+-		case TelemetryConfiguration.CRASH:
+-			return TelemetryLevel.CRASH;
+-		case TelemetryConfiguration.OFF:
+-			return TelemetryLevel.NONE;
+-	}
++	return TelemetryLevel.NONE;
+ }
+ 
+ export interface Properties {
+diff --git a/src/vs/platform/telemetry/node/appInsightsAppender.ts b/src/vs/platform/telemetry/node/appInsightsAppender.ts
+--- a/src/vs/platform/telemetry/node/appInsightsAppender.ts
++++ b/src/vs/platform/telemetry/node/appInsightsAppender.ts
+@@ -3,119 +3,20 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
+-import type { TelemetryClient } from 'applicationinsights';
+-import { onUnexpectedError } from 'vs/base/common/errors';
+-import { mixin } from 'vs/base/common/objects';
+-import { ITelemetryAppender, validateTelemetryData } from 'vs/platform/telemetry/common/telemetryUtils';
+-
+-async function getClient(aiKey: string): Promise<TelemetryClient> {
+-	const appInsights = await import('applicationinsights');
+-	let client: TelemetryClient;
+-	if (appInsights.defaultClient) {
+-		client = new appInsights.TelemetryClient(aiKey);
+-		client.channel.setUseDiskRetryCaching(true);
+-	} else {
+-		appInsights.setup(aiKey)
+-			.setAutoCollectRequests(false)
+-			.setAutoCollectPerformance(false)
+-			.setAutoCollectExceptions(false)
+-			.setAutoCollectDependencies(false)
+-			.setAutoDependencyCorrelation(false)
+-			.setAutoCollectConsole(false)
+-			.setInternalLogging(false, false)
+-			.setUseDiskRetryCaching(true)
+-			.start();
+-		client = appInsights.defaultClient;
+-	}
+-
+-	if (aiKey.indexOf('AIF-') === 0) {
+-		client.config.endpointUrl = 'https://mobile.events.data.microsoft.com/collect/v1';
+-	}
+-	return client;
+-}
++import { ITelemetryAppender } from 'vs/platform/telemetry/common/telemetryUtils';
+ 
+ 
+ export class AppInsightsAppender implements ITelemetryAppender {
+ 
+-	private _aiClient: string | TelemetryClient | undefined;
+-	private _asyncAIClient: Promise<TelemetryClient> | null;
+-
+ 	constructor(
+-		private _eventPrefix: string,
+-		private _defaultData: { [key: string]: any } | null,
+-		aiKeyOrClientFactory: string | (() => TelemetryClient), // allow factory function for testing
++		eventPrefix: string,
++		defaultData: { [key: string]: any } | null,
++		aiKeyOrClientFactory: string | (() => any), // allow factory function for testing
+ 	) {
+-		if (!this._defaultData) {
+-			this._defaultData = Object.create(null);
+-		}
+-
+-		if (typeof aiKeyOrClientFactory === 'function') {
+-			this._aiClient = aiKeyOrClientFactory();
+-		} else {
+-			this._aiClient = aiKeyOrClientFactory;
+-		}
+-		this._asyncAIClient = null;
+ 	}
+ 
+-	private _withAIClient(callback: (aiClient: TelemetryClient) => void): void {
+-		if (!this._aiClient) {
+-			return;
+-		}
+ 
+-		if (typeof this._aiClient !== 'string') {
+-			callback(this._aiClient);
+-			return;
+-		}
++	log(eventName: string, data?: any): void { }
+ 
+-		if (!this._asyncAIClient) {
+-			this._asyncAIClient = getClient(this._aiClient);
+-		}
+-
+-		this._asyncAIClient.then(
+-			(aiClient) => {
+-				callback(aiClient);
+-			},
+-			(err) => {
+-				onUnexpectedError(err);
+-				console.error(err);
+-			}
+-		);
+-	}
+-
+-	log(eventName: string, data?: any): void {
+-		if (!this._aiClient) {
+-			return;
+-		}
+-		data = mixin(data, this._defaultData);
+-		data = validateTelemetryData(data);
+-
+-		// Attemps to suppress https://github.com/microsoft/vscode/issues/140624
+-		try {
+-			this._withAIClient((aiClient) => aiClient.trackEvent({
+-				name: this._eventPrefix + '/' + eventName,
+-				properties: data.properties,
+-				measurements: data.measurements
+-			}));
+-		} catch { }
+-	}
+-
+-	flush(): Promise<any> {
+-		if (this._aiClient) {
+-			return new Promise(resolve => {
+-				this._withAIClient((aiClient) => {
+-					// Attempts to suppress https://github.com/microsoft/vscode/issues/140624
+-					try {
+-						aiClient.flush({
+-							callback: () => {
+-								// all data flushed
+-								this._aiClient = undefined;
+-								resolve(undefined);
+-							}
+-						});
+-					} catch { }
+-				});
+-			});
+-		}
+-		return Promise.resolve(undefined);
+-	}
++	flush(): Promise<any> { return Promise.resolve(null); }
+ }
+diff --git a/src/vs/server/node/serverServices.ts b/src/vs/server/node/serverServices.ts
+--- a/src/vs/server/node/serverServices.ts
++++ b/src/vs/server/node/serverServices.ts
+@@ -3,9 +3,8 @@
+  *  Licensed under the MIT License. See License.txt in the project root for license information.
+  *--------------------------------------------------------------------------------------------*/
+ 
+-import { hostname, release } from 'os';
+ import { Emitter, Event } from 'vs/base/common/event';
+-import { DisposableStore, toDisposable } from 'vs/base/common/lifecycle';
++import { DisposableStore } from 'vs/base/common/lifecycle';
+ import { Schemas } from 'vs/base/common/network';
+ import * as path from 'vs/base/common/path';
+ import { IURITransformer } from 'vs/base/common/uriIpc';
+@@ -46,11 +45,8 @@ import { RemoteAgentConnectionContext } from 'vs/platform/remote/common/remoteAg
+ import { IRequestService } from 'vs/platform/request/common/request';
+ import { RequestChannel } from 'vs/platform/request/common/requestIpc';
+ import { RequestService } from 'vs/platform/request/node/requestService';
+-import { resolveCommonProperties } from 'vs/platform/telemetry/common/commonProperties';
+-import { ITelemetryService, TelemetryLevel } from 'vs/platform/telemetry/common/telemetry';
+-import { ITelemetryServiceConfig } from 'vs/platform/telemetry/common/telemetryService';
+-import { getPiiPathsFromEnvironment, ITelemetryAppender, NullAppender, supportsTelemetry } from 'vs/platform/telemetry/common/telemetryUtils';
+-import { AppInsightsAppender } from 'vs/platform/telemetry/node/appInsightsAppender';
++import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
++import { ITelemetryAppender, NullAppender } from 'vs/platform/telemetry/common/telemetryUtils';
+ import ErrorTelemetry from 'vs/platform/telemetry/node/errorTelemetry';
+ import { IPtyService, TerminalSettingId } from 'vs/platform/terminal/common/terminal';
+ import { PtyHostService } from 'vs/platform/terminal/node/ptyHostService';
+@@ -59,7 +55,7 @@ import { UriIdentityService } from 'vs/platform/uriIdentity/common/uriIdentitySe
+ import { RemoteAgentEnvironmentChannel } from 'vs/server/node/remoteAgentEnvironmentImpl';
+ import { RemoteAgentFileSystemProviderChannel } from 'vs/server/node/remoteFileSystemProviderServer';
+ import { ServerTelemetryChannel } from 'vs/platform/telemetry/common/remoteTelemetryChannel';
+-import { IServerTelemetryService, ServerNullTelemetryService, ServerTelemetryService } from 'vs/platform/telemetry/common/serverTelemetryService';
++import { IServerTelemetryService, ServerNullTelemetryService } from 'vs/platform/telemetry/common/serverTelemetryService';
+ import { RemoteTerminalChannel } from 'vs/server/node/remoteTerminalChannel';
+ import { createURITransformer } from 'vs/workbench/api/node/uriTransformer';
+ import { ServerConnectionToken } from 'vs/server/node/serverConnectionToken';
+@@ -74,8 +70,6 @@ import { ExtensionsProfileScannerService, IExtensionsProfileScannerService } fro
+ import { IUserDataProfilesService, UserDataProfilesService } from 'vs/platform/userDataProfile/common/userDataProfile';
+ import { NullPolicyService } from 'vs/platform/policy/common/policy';
+ 
+-const eventPrefix = 'monacoworkbench';
+-
+ export async function setupServerServices(connectionToken: ServerConnectionToken, args: ServerParsedArgs, REMOTE_DATA_FOLDER: string, disposables: DisposableStore) {
+ 	const services = new ServiceCollection();
+ 	const socketServer = new SocketServer<RemoteAgentConnectionContext>();
+@@ -130,33 +124,7 @@ export async function setupServerServices(connectionToken: ServerConnectionToken
+ 
+ 	let appInsightsAppender: ITelemetryAppender = NullAppender;
+ 	const machineId = await getMachineId();
+-	if (supportsTelemetry(productService, environmentService)) {
+-		if (productService.aiConfig && productService.aiConfig.asimovKey) {
+-			appInsightsAppender = new AppInsightsAppender(eventPrefix, null, productService.aiConfig.asimovKey);
+-			disposables.add(toDisposable(() => appInsightsAppender!.flush())); // Ensure the AI appender is disposed so that it flushes remaining data
+-		}
+-
+-		const config: ITelemetryServiceConfig = {
+-			appenders: [appInsightsAppender],
+-			commonProperties: resolveCommonProperties(fileService, release(), hostname(), process.arch, productService.commit, productService.version + '-remote', machineId, productService.msftInternalDomains, environmentService.installSourcePath, 'remoteAgent'),
+-			piiPaths: getPiiPathsFromEnvironment(environmentService)
+-		};
+-		const initialTelemetryLevelArg = environmentService.args['telemetry-level'];
+-		let injectedTelemetryLevel: TelemetryLevel = TelemetryLevel.USAGE;
+-		// Convert the passed in CLI argument into a telemetry level for the telemetry service
+-		if (initialTelemetryLevelArg === 'all') {
+-			injectedTelemetryLevel = TelemetryLevel.USAGE;
+-		} else if (initialTelemetryLevelArg === 'error') {
+-			injectedTelemetryLevel = TelemetryLevel.ERROR;
+-		} else if (initialTelemetryLevelArg === 'crash') {
+-			injectedTelemetryLevel = TelemetryLevel.CRASH;
+-		} else if (initialTelemetryLevelArg !== undefined) {
+-			injectedTelemetryLevel = TelemetryLevel.NONE;
+-		}
+-		services.set(IServerTelemetryService, new SyncDescriptor(ServerTelemetryService, [config, injectedTelemetryLevel]));
+-	} else {
+-		services.set(IServerTelemetryService, ServerNullTelemetryService);
+-	}
++	services.set(IServerTelemetryService, ServerNullTelemetryService);
+ 
+ 	services.set(IExtensionGalleryService, new SyncDescriptor(ExtensionGalleryServiceWithNoStorageService));
+ 
+diff --git a/src/vs/workbench/api/browser/mainThreadTelemetry.ts b/src/vs/workbench/api/browser/mainThreadTelemetry.ts
+--- a/src/vs/workbench/api/browser/mainThreadTelemetry.ts
++++ b/src/vs/workbench/api/browser/mainThreadTelemetry.ts
+@@ -8,7 +8,6 @@ import { IEnvironmentService } from 'vs/platform/environment/common/environment'
+ import { IProductService } from 'vs/platform/product/common/productService';
+ import { ClassifiedEvent, GDPRClassification, StrictPropertyCheck } from 'vs/platform/telemetry/common/gdprTypings';
+ import { ITelemetryService, TelemetryLevel } from 'vs/platform/telemetry/common/telemetry';
+-import { supportsTelemetry } from 'vs/platform/telemetry/common/telemetryUtils';
+ import { extHostNamedCustomer, IExtHostContext } from 'vs/workbench/services/extensions/common/extHostCustomers';
+ import { ExtHostContext, ExtHostTelemetryShape, MainContext, MainThreadTelemetryShape } from '../common/extHost.protocol';
+ 
+@@ -21,27 +20,17 @@ export class MainThreadTelemetry extends Disposable implements MainThreadTelemet
+ 	constructor(
+ 		extHostContext: IExtHostContext,
+ 		@ITelemetryService private readonly _telemetryService: ITelemetryService,
+-		@IEnvironmentService private readonly _environmentService: IEnvironmentService,
++		@IEnvironmentService _environmentService: IEnvironmentService,
+ 		@IProductService private readonly _productService: IProductService
+ 	) {
+ 		super();
+ 
+ 		this._proxy = extHostContext.getProxy(ExtHostContext.ExtHostTelemetry);
+ 
+-		if (supportsTelemetry(this._productService, this._environmentService)) {
+-			this._register(_telemetryService.telemetryLevel.onDidChange(level => {
+-				this._proxy.$onDidChangeTelemetryLevel(level);
+-			}));
+-		}
+-
+ 		this._proxy.$initializeTelemetryLevel(this.telemetryLevel, this._productService.enabledTelemetryLevels);
+ 	}
+ 
+ 	private get telemetryLevel(): TelemetryLevel {
+-		if (!supportsTelemetry(this._productService, this._environmentService)) {
+-			return TelemetryLevel.NONE;
+-		}
+-
+ 		return this._telemetryService.telemetryLevel.value;
+ 	}
+ 
+@@ -55,5 +44,3 @@ export class MainThreadTelemetry extends Disposable implements MainThreadTelemet
+ 		this.$publicLog(eventName, data as any);
+ 	}
+ }
+-
+-
+diff --git a/src/vs/workbench/contrib/logs/common/logs.contribution.ts b/src/vs/workbench/contrib/logs/common/logs.contribution.ts
+--- a/src/vs/workbench/contrib/logs/common/logs.contribution.ts
++++ b/src/vs/workbench/contrib/logs/common/logs.contribution.ts
+@@ -14,10 +14,9 @@ import { IWorkbenchEnvironmentService } from 'vs/workbench/services/environment/
+ import { IFileService } from 'vs/platform/files/common/files';
+ import { IOutputService, registerLogChannel } from 'vs/workbench/services/output/common/output';
+ import { Disposable, toDisposable } from 'vs/base/common/lifecycle';
+-import { ILogService, LogLevel } from 'vs/platform/log/common/log';
++import { ILogService } from 'vs/platform/log/common/log';
+ import { LifecyclePhase } from 'vs/workbench/services/lifecycle/common/lifecycle';
+ import { ServicesAccessor } from 'vs/platform/instantiation/common/instantiation';
+-import { supportsTelemetry } from 'vs/platform/telemetry/common/telemetryUtils';
+ import { IProductService } from 'vs/platform/product/common/productService';
+ import { URI } from 'vs/base/common/uri';
+ 
+@@ -28,7 +27,7 @@ class LogOutputChannels extends Disposable implements IWorkbenchContribution {
+ 
+ 	constructor(
+ 		@IWorkbenchEnvironmentService private readonly environmentService: IWorkbenchEnvironmentService,
+-		@IProductService private readonly productService: IProductService,
++		@IProductService productService: IProductService,
+ 		@ILogService private readonly logService: ILogService,
+ 		@IFileService private readonly fileService: IFileService,
+ 	) {
+@@ -41,10 +40,6 @@ class LogOutputChannels extends Disposable implements IWorkbenchContribution {
+ 		this.registerLogChannel(Constants.rendererLogChannelId, nls.localize('rendererLog', "Window"), this.environmentService.logFile);
+ 
+ 		const registerTelemetryChannel = () => {
+-			if (supportsTelemetry(this.productService, this.environmentService) && this.logService.getLevel() === LogLevel.Trace) {
+-				this.registerLogChannel(Constants.telemetryLogChannelId, nls.localize('telemetryLog', "Telemetry"), this.environmentService.telemetryLogResource);
+-				return true;
+-			}
+ 			return false;
+ 		};
+ 		if (!registerTelemetryChannel()) {
+diff --git a/src/vs/workbench/contrib/update/browser/releaseNotesEditor.ts b/src/vs/workbench/contrib/update/browser/releaseNotesEditor.ts
+--- a/src/vs/workbench/contrib/update/browser/releaseNotesEditor.ts
++++ b/src/vs/workbench/contrib/update/browser/releaseNotesEditor.ts
+@@ -28,9 +28,7 @@ import { IWebviewWorkbenchService } from 'vs/workbench/contrib/webviewPanel/brow
+ import { IEditorGroupsService } from 'vs/workbench/services/editor/common/editorGroupsService';
+ import { ACTIVE_GROUP, IEditorService } from 'vs/workbench/services/editor/common/editorService';
+ import { IExtensionService } from 'vs/workbench/services/extensions/common/extensions';
+-import { getTelemetryLevel, supportsTelemetry } from 'vs/platform/telemetry/common/telemetryUtils';
+ import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
+-import { TelemetryLevel } from 'vs/platform/telemetry/common/telemetry';
+ 
+ export class ReleaseNotesManager {
+ 
+@@ -40,17 +38,17 @@ export class ReleaseNotesManager {
+ 	private _lastText: string | undefined;
+ 
+ 	public constructor(
+-		@IEnvironmentService private readonly _environmentService: IEnvironmentService,
++		@IEnvironmentService _environmentService: IEnvironmentService,
+ 		@IKeybindingService private readonly _keybindingService: IKeybindingService,
+ 		@ILanguageService private readonly _languageService: ILanguageService,
+ 		@IOpenerService private readonly _openerService: IOpenerService,
+ 		@IRequestService private readonly _requestService: IRequestService,
+-		@IConfigurationService private readonly _configurationService: IConfigurationService,
++		@IConfigurationService _configurationService: IConfigurationService,
+ 		@IEditorService private readonly _editorService: IEditorService,
+ 		@IEditorGroupsService private readonly _editorGroupService: IEditorGroupsService,
+ 		@IWebviewWorkbenchService private readonly _webviewWorkbenchService: IWebviewWorkbenchService,
+ 		@IExtensionService private readonly _extensionService: IExtensionService,
+-		@IProductService private readonly _productService: IProductService
++		@IProductService _productService: IProductService
+ 	) {
+ 		TokenizationRegistry.onDidChange(async () => {
+ 			if (!this._currentReleaseNotes || !this._lastText) {
+@@ -198,11 +196,6 @@ export class ReleaseNotesManager {
+ 	}
+ 
+ 	private async addGAParameters(uri: URI, origin: string, experiment = '1'): Promise<URI> {
+-		if (supportsTelemetry(this._productService, this._environmentService) && getTelemetryLevel(this._configurationService) === TelemetryLevel.USAGE) {
+-			if (uri.scheme === 'https' && uri.authority === 'code.visualstudio.com') {
+-				return uri.with({ query: `${uri.query ? uri.query + '&' : ''}utm_source=VsCode&utm_medium=${encodeURIComponent(origin)}&utm_content=${encodeURIComponent(experiment)}` });
+-			}
+-		}
+ 		return uri;
+ 	}
+ 
+diff --git a/src/vs/workbench/services/extensionResourceLoader/common/extensionResourceLoader.ts b/src/vs/workbench/services/extensionResourceLoader/common/extensionResourceLoader.ts
+--- a/src/vs/workbench/services/extensionResourceLoader/common/extensionResourceLoader.ts
++++ b/src/vs/workbench/services/extensionResourceLoader/common/extensionResourceLoader.ts
+@@ -12,10 +12,7 @@ import { IEnvironmentService } from 'vs/platform/environment/common/environment'
+ import { IFileService } from 'vs/platform/files/common/files';
+ import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
+ import { IProductService } from 'vs/platform/product/common/productService';
+-import { getServiceMachineId } from 'vs/platform/externalServices/common/serviceMachineId';
+ import { IStorageService } from 'vs/platform/storage/common/storage';
+-import { TelemetryLevel } from 'vs/platform/telemetry/common/telemetry';
+-import { getTelemetryLevel, supportsTelemetry } from 'vs/platform/telemetry/common/telemetryUtils';
+ import { RemoteAuthorities } from 'vs/base/common/network';
+ import { getRemoteServerRootPath } from 'vs/platform/remote/common/remoteHosts';
+ 
+@@ -56,10 +53,10 @@ export abstract class AbstractExtensionResourceLoaderService implements IExtensi
+ 
+ 	constructor(
+ 		protected readonly _fileService: IFileService,
+-		private readonly _storageService: IStorageService,
++		_storageService: IStorageService,
+ 		private readonly _productService: IProductService,
+-		private readonly _environmentService: IEnvironmentService,
+-		private readonly _configurationService: IConfigurationService,
++		_environmentService: IEnvironmentService,
++		_configurationService: IConfigurationService,
+ 	) {
+ 		this._webExtensionResourceEndPoint = `${getRemoteServerRootPath(_productService)}/${WEB_EXTENSION_RESOURCE_END_POINT}/`;
+ 		if (_productService.extensionsGallery) {
+@@ -92,23 +89,12 @@ export abstract class AbstractExtensionResourceLoaderService implements IExtensi
+ 			'X-Client-Name': `${this._productService.applicationName}${isWeb ? '-web' : ''}`,
+ 			'X-Client-Version': this._productService.version
+ 		};
+-		if (supportsTelemetry(this._productService, this._environmentService) && getTelemetryLevel(this._configurationService) === TelemetryLevel.USAGE) {
+-			headers['X-Machine-Id'] = await this._getServiceMachineId();
+-		}
+ 		if (this._productService.commit) {
+ 			headers['X-Client-Commit'] = this._productService.commit;
+ 		}
+ 		return headers;
+ 	}
+ 
+-	private _serviceMachineIdPromise: Promise<string> | undefined;
+-	private _getServiceMachineId(): Promise<string> {
+-		if (!this._serviceMachineIdPromise) {
+-			this._serviceMachineIdPromise = getServiceMachineId(this._environmentService, this._fileService, this._storageService);
+-		}
+-		return this._serviceMachineIdPromise;
+-	}
+-
+ 	private _getExtensionGalleryAuthority(uri: URI): string | undefined {
+ 		if (this._isWebExtensionResourceEndPoint(uri)) {
+ 			return uri.authority;
+diff --git a/src/vs/workbench/services/telemetry/browser/telemetryService.ts b/src/vs/workbench/services/telemetry/browser/telemetryService.ts
+--- a/src/vs/workbench/services/telemetry/browser/telemetryService.ts
++++ b/src/vs/workbench/services/telemetry/browser/telemetryService.ts
+@@ -10,23 +10,18 @@ import { registerSingleton } from 'vs/platform/instantiation/common/extensions';
+ import { ILoggerService } from 'vs/platform/log/common/log';
+ import { IProductService } from 'vs/platform/product/common/productService';
+ import { IStorageService } from 'vs/platform/storage/common/storage';
+-import { OneDataSystemWebAppender } from 'vs/platform/telemetry/browser/1dsAppender';
+-import { WebAppInsightsAppender } from 'vs/platform/telemetry/browser/appInsightsAppender';
+ import { ClassifiedEvent, GDPRClassification, StrictPropertyCheck } from 'vs/platform/telemetry/common/gdprTypings';
+ import { ITelemetryData, ITelemetryInfo, ITelemetryService, TelemetryLevel } from 'vs/platform/telemetry/common/telemetry';
+-import { TelemetryLogAppender } from 'vs/platform/telemetry/common/telemetryLogAppender';
+-import { ITelemetryServiceConfig, TelemetryService as BaseTelemetryService } from 'vs/platform/telemetry/common/telemetryService';
+-import { ITelemetryAppender, NullTelemetryService, supportsTelemetry } from 'vs/platform/telemetry/common/telemetryUtils';
++import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
+ import { IBrowserWorkbenchEnvironmentService } from 'vs/workbench/services/environment/browser/environmentService';
+ import { IRemoteAgentService } from 'vs/workbench/services/remote/common/remoteAgentService';
+-import { resolveWorkbenchCommonProperties } from 'vs/workbench/services/telemetry/browser/workbenchCommonProperties';
+ 
+ export class TelemetryService extends Disposable implements ITelemetryService {
+ 
+ 	declare readonly _serviceBrand: undefined;
+ 
+ 	private impl: ITelemetryService;
+-	public readonly sendErrorTelemetry = true;
++	public readonly sendErrorTelemetry = false;
+ 
+ 	constructor(
+ 		@IBrowserWorkbenchEnvironmentService environmentService: IBrowserWorkbenchEnvironmentService,
+@@ -37,29 +32,7 @@ export class TelemetryService extends Disposable implements ITelemetryService {
+ 		@IRemoteAgentService remoteAgentService: IRemoteAgentService
+ 	) {
+ 		super();
+-
+-		if (supportsTelemetry(productService, environmentService) && productService.aiConfig?.asimovKey && productService.aiConfig?.ariaKey) {
+-			// If remote server is present send telemetry through that, else use the client side appender
+-			const internalTesting = configurationService.getValue<boolean>('telemetry.internalTesting');
+-			const appenders = [];
+-			if (internalTesting || productService.aiConfig?.preferAria) {
+-				const telemetryProvider: ITelemetryAppender = remoteAgentService.getConnection() !== null ? { log: remoteAgentService.logTelemetry.bind(remoteAgentService), flush: remoteAgentService.flushTelemetry.bind(remoteAgentService) } : new OneDataSystemWebAppender(configurationService, 'monacoworkbench', null, productService.aiConfig?.ariaKey);
+-				appenders.push(telemetryProvider);
+-			} else {
+-				const telemetryProvider: ITelemetryAppender = remoteAgentService.getConnection() !== null ? { log: remoteAgentService.logTelemetry.bind(remoteAgentService), flush: remoteAgentService.flushTelemetry.bind(remoteAgentService) } : new WebAppInsightsAppender('monacoworkbench', productService.aiConfig?.asimovKey);
+-				appenders.push(telemetryProvider);
+-			}
+-			appenders.push(new TelemetryLogAppender(loggerService, environmentService));
+-			const config: ITelemetryServiceConfig = {
+-				appenders,
+-				commonProperties: resolveWorkbenchCommonProperties(storageService, productService.commit, productService.version, environmentService.remoteAuthority, productService.embedderIdentifier, productService.removeTelemetryMachineId, environmentService.options && environmentService.options.resolveCommonTelemetryProperties),
+-				sendErrorTelemetry: this.sendErrorTelemetry,
+-			};
+-
+-			this.impl = this._register(new BaseTelemetryService(config, configurationService, productService));
+-		} else {
+-			this.impl = NullTelemetryService;
+-		}
++		this.impl = NullTelemetryService;
+ 	}
+ 
+ 	setExperimentProperty(name: string, value: string): void {
+diff --git a/src/vs/workbench/services/telemetry/electron-sandbox/telemetryService.ts b/src/vs/workbench/services/telemetry/electron-sandbox/telemetryService.ts
+--- a/src/vs/workbench/services/telemetry/electron-sandbox/telemetryService.ts
++++ b/src/vs/workbench/services/telemetry/electron-sandbox/telemetryService.ts
+@@ -4,16 +4,13 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import { ITelemetryService, ITelemetryInfo, ITelemetryData, TelemetryLevel } from 'vs/platform/telemetry/common/telemetry';
+-import { supportsTelemetry, NullTelemetryService, getPiiPathsFromEnvironment } from 'vs/platform/telemetry/common/telemetryUtils';
++import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
+ import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
+ import { Disposable } from 'vs/base/common/lifecycle';
+ import { INativeWorkbenchEnvironmentService } from 'vs/workbench/services/environment/electron-sandbox/environmentService';
+ import { IProductService } from 'vs/platform/product/common/productService';
+ import { ISharedProcessService } from 'vs/platform/ipc/electron-sandbox/services';
+-import { TelemetryAppenderClient } from 'vs/platform/telemetry/common/telemetryIpc';
+ import { IStorageService } from 'vs/platform/storage/common/storage';
+-import { resolveWorkbenchCommonProperties } from 'vs/workbench/services/telemetry/electron-sandbox/workbenchCommonProperties';
+-import { TelemetryService as BaseTelemetryService, ITelemetryServiceConfig } from 'vs/platform/telemetry/common/telemetryService';
+ import { registerSingleton } from 'vs/platform/instantiation/common/extensions';
+ import { ClassifiedEvent, StrictPropertyCheck, GDPRClassification } from 'vs/platform/telemetry/common/gdprTypings';
+ import { IFileService } from 'vs/platform/files/common/files';
+@@ -36,19 +33,8 @@ export class TelemetryService extends Disposable implements ITelemetryService {
+ 	) {
+ 		super();
+ 
+-		if (supportsTelemetry(productService, environmentService)) {
+-			const channel = sharedProcessService.getChannel('telemetryAppender');
+-			const config: ITelemetryServiceConfig = {
+-				appenders: [new TelemetryAppenderClient(channel)],
+-				commonProperties: resolveWorkbenchCommonProperties(storageService, fileService, environmentService.os.release, environmentService.os.hostname, productService.commit, productService.version, environmentService.machineId, productService.msftInternalDomains, environmentService.installSourcePath, environmentService.remoteAuthority),
+-				piiPaths: getPiiPathsFromEnvironment(environmentService),
+-				sendErrorTelemetry: true
+-			};
+-
+-			this.impl = this._register(new BaseTelemetryService(config, configurationService, productService));
+-		} else {
+-			this.impl = NullTelemetryService;
+-		}
++
++		this.impl = NullTelemetryService;
+ 
+ 		this.sendErrorTelemetry = this.impl.sendErrorTelemetry;
+ 	}
